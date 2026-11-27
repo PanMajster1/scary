@@ -13,6 +13,26 @@ Wystarczy otworzyć `index.html` w Chrome / Edge / Firefox (zalecany Chrome). Th
 python3 -m http.server 8000   # i wejdź na http://localhost:8000
 ```
 
+## Wersja na Windows (.exe)
+
+Gra ma natywny wrapper Electron (`main.js`, `package.json`). Gotowy plik `.exe` (wersja przenośna, bez instalatora):
+
+```bash
+npm install
+npm run dist      # powstaje dist/Ucieczka-z-TK25-1.0.0.exe
+npm start         # uruchomienie okna Electron bez budowania
+```
+
+Przy każdym pushu workflow GitHub Actions (`.github/workflows/build-windows.yml`) buduje `.exe` na Windowsie
+i wystawia go jako artefakt zakładki Actions. W aplikacji: `F11` pełny ekran, `Ctrl+Q` wyjście.
+
+## Grafika
+
+Materiały PBR (odbicia, mapy nierówności), prawdziwe szyby z ramami, parapetami i grzejnikami, mapa środowiska,
+cień latarki, własny post-processing (bloom, ACES, winieta, ziarno, aberracja chromatyczna w pościgu).
+Jakość zmienisz w pauzie (`Esc`): Auto / Wysoka / Średnia / Niska — Auto sama obniża poziom na słabszych komputerach.
+Własne zdjęcia tekstur podmienisz według `assets/README.md`.
+
 ## Pliki
 
 | plik | zawartość |

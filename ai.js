@@ -10,7 +10,7 @@ const AI = (() => {
 
   // --------------------------------------------------------------- definicje
   const DEFS = {
-    topinek: { name: 'Rafał Topinek', tag: 'Topinek • łowca', kind: 'hunter', color: 0x2c3a52, pants: 0x1c1c24, hair: 0x2a2018, hostile: true, scale: 1.0,
+    topinek: { name: 'Rafał Topinek', tag: 'Topinek • łowca', kind: 'hunter', glasses: true, skin: 0, color: 0x2c3a52, pants: 0x1c1c24, hair: 0x2a2018, hostile: true, scale: 1.0,
       patrol: 1.7, chase: [4.0, 4.0, 5.0, 5.3], vision: 17, fov: 130,
       lines: { spot: ['Panie Nawrocki!', 'Czarna lista!', 'Stój pan!'], chase: ['Redo się zjebało!', 'Odpalamy Ventoya!', 'Panie Nawrocki!!!'], search: ['Gdzie on polazł...', 'Redo się zjebało!'], caught: ['Czarna lista, panie Nawrocki!'] } },
     demkow: { name: 'Gabriel Demkow', tag: 'MEGA BOSS • Demkow', kind: 'hunter', color: 0x161616, pants: 0x101010, hair: 0x111111, hostile: true, scale: 1.28, boss: true,
@@ -22,7 +22,7 @@ const AI = (() => {
     orlowska: { name: 'Karolina Orłowska', tag: 'Orłowska • polski', kind: 'quiz', quiz: 'pl', color: 0x2f6a5a, pants: 0x222a2a, hair: 0x2a1a10, hostile: true, female: true,
       patrol: 1.5, chase: 3.0, vision: 12, fov: 110,
       lines: { spot: ['Moi drodzy...', 'Albo wiecie, albo jeden!'], chase: ['Cała klasa jedynki!', 'Moi drodzy...'], search: ['Moi drodzy...'], caught: ['Albo wiecie, albo jeden!'] } },
-    iduszkiewicz: { name: 'Iwona Duszkiewicz', tag: 'I. Duszkiewicz • matma', kind: 'quiz', quiz: 'math', color: 0x6a5a2f, pants: 0x2a2822, hair: 0x888078, hostile: true, female: true,
+    iduszkiewicz: { name: 'Iwona Duszkiewicz', tag: 'I. Duszkiewicz • matma', glasses: true, kind: 'quiz', quiz: 'math', color: 0x6a5a2f, pants: 0x2a2822, hair: 0x888078, hostile: true, female: true,
       patrol: 1.5, chase: 3.0, vision: 12, fov: 110,
       lines: { spot: ['Funkcja liniowa!', 'Trójkąt!'], chase: ['Oddaj telefon!', 'Funkcja liniowa!'], search: ['Trójkąt!'], caught: ['Oddaj telefon!'] } },
     kowalczyk: { name: 'Maciej Kowalczyk', tag: 'Kowalczyk • dyżurny', kind: 'situational', color: 0x4a4a2a, pants: 0x222222, hair: 0x3a2a1a, hostile: true,
@@ -30,7 +30,7 @@ const AI = (() => {
       lines: { spot: ['Nawrocki, od razu jeden!', 'Gówniarze na Kawasaki!'], chase: ['Gówniarze na Kawasaki!', 'Nawrocki, od razu jeden!'], search: ['Gówniarze na Kawasaki!'], caught: ['Nawrocki, od razu jeden!'] } },
     ziebinski: { name: 'Ziębiński', tag: 'Ziębiński • sojusznik', kind: 'ally', color: 0x3a3a3a, pants: 0x20242c, hair: 0x4a3a2a, ally: true, patrol: 0, speed: 5.4,
       lines: { idle: ['Kurwa panowie...', 'Jak mnie Topin dopadnie...', 'Która tam na ośce?', 'Szlugen machen!'] } },
-    florczykiewicz: { name: 'Zbigniew Florczykiewicz', tag: 'Siwy • Ślusarnia', kind: 'static', color: 0x5a5a60, pants: 0x2a2a30, hair: 0xb8b8b8, ally: true,
+    florczykiewicz: { name: 'Zbigniew Florczykiewicz', tag: 'Siwy • Ślusarnia', glasses: true, jacket: false, kind: 'static', color: 0x5a5a60, pants: 0x2a2a30, hair: 0xb8b8b8, ally: true,
       lines: { idle: ['Odpalamy cipsko Packet Tracer!', 'Prezydent musi mieć 5!'] } },
     mariusz: { name: 'Mariusz Duszkiewicz', tag: 'M. Duszkiewicz • ojciec', kind: 'static', color: 0x3a5a3a, pants: 0x2a2a2a, hair: 0x2a2a2a, ally: true, scale: 1.05,
       lines: { idle: ['Ojciec wie najlepiej.', 'Młody, nie szukasz mojego e-peta?'] } },
@@ -78,35 +78,77 @@ const AI = (() => {
 
   // --------------------------------------------------------------- model
   const boxGeo = new THREE.BoxGeometry(1, 1, 1);
-  const lm = (c) => new THREE.MeshLambertMaterial({ color: c });
-  function limb(w, h, d, mat, y) { const p = new THREE.Group(); const m = new THREE.Mesh(boxGeo, mat); m.scale.set(w, h, d); m.position.y = -h / 2; p.add(m); p.position.y = y; return p; }
+  const std = (c, r = 0.65, m = 0) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m, envMapIntensity: 0.5 });
+  const GEO = { cyl: new THREE.CylinderGeometry(1, 1, 1, 14), sph: new THREE.SphereGeometry(1, 16, 12), cone: new THREE.CylinderGeometry(0.75, 1, 1, 16), cap: new THREE.SphereGeometry(1, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.58) };
+  function mesh(geo, mat, sx, sy, sz, x, y, z) { const m = new THREE.Mesh(geo, mat); m.scale.set(sx, sy, sz); m.position.set(x, y, z); return m; }
+  function limbG(r, len, mat, y, tipMat, tipR) { const p = new THREE.Group(); const m = mesh(GEO.cyl, mat, r, len, r, 0, -len / 2, 0); p.add(m); if (tipMat) p.add(mesh(GEO.sph, tipMat, tipR, tipR, tipR, 0, -len - tipR * 0.4, 0)); p.position.y = y; return p; }
   function labelSprite(text, sub, color) {
     const c = document.createElement('canvas'); c.width = 512; c.height = 128; const g = c.getContext('2d');
     g.fillStyle = 'rgba(0,0,0,0.55)'; g.fillRect(0, 20, 512, 92);
     g.textAlign = 'center'; g.fillStyle = color; g.font = 'bold 44px Arial'; g.fillText(text, 256, 66);
     g.fillStyle = '#ddd'; g.font = '26px Arial'; g.fillText(sub, 256, 100);
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
-    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthWrite: false }));
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthWrite: false, toneMapped: false }));
     s.scale.set(1.8, 0.45, 1); return s;
   }
   function bangSprite() {
     const c = document.createElement('canvas'); c.width = 64; c.height = 64; const g = c.getContext('2d');
     g.fillStyle = '#ff2020'; g.font = 'bold 60px Arial'; g.textAlign = 'center'; g.fillText('!', 32, 54); g.strokeStyle = '#000'; g.lineWidth = 2; g.strokeText('!', 32, 54);
-    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false })); s.scale.set(0.5, 0.5, 1); return s;
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false, toneMapped: false })); s.scale.set(0.5, 0.5, 1); return s;
   }
+  const faceCache = {};
+  function faceTex(def) {
+    const key = (def.skin || 0) + ':' + (def.female ? 1 : 0) + ':' + (def.boss ? 1 : 0) + ':' + (def.glasses ? 1 : 0) + ':' + (def.mood || 0);
+    if (faceCache[key]) return faceCache[key];
+    const c = document.createElement('canvas'); c.width = 128; c.height = 128; const g = c.getContext('2d');
+    g.clearRect(0, 0, 128, 128);
+    // oczy
+    for (const x of [44, 84]) { g.fillStyle = '#f4f1ec'; g.beginPath(); g.ellipse(x, 62, 11, 7.5, 0, 0, 7); g.fill(); g.fillStyle = def.female ? '#3a5a7a' : '#3a2a1a'; g.beginPath(); g.arc(x + 1, 62, 5, 0, 7); g.fill(); g.fillStyle = '#000'; g.beginPath(); g.arc(x + 1, 62, 2.4, 0, 7); g.fill(); g.fillStyle = '#fff'; g.fillRect(x - 1, 59, 2, 2); }
+    // brwi (zmarszczone przy wrogach)
+    g.strokeStyle = def.hair ? '#' + def.hair.toString(16).padStart(6, '0') : '#222'; g.lineWidth = 5; g.lineCap = 'round';
+    const ang = def.hostile ? 6 : 0; g.beginPath(); g.moveTo(32, 46 + ang); g.lineTo(56, 44 - ang); g.stroke(); g.beginPath(); g.moveTo(72, 44 - ang); g.lineTo(96, 46 + ang); g.stroke();
+    // nos i usta
+    g.strokeStyle = 'rgba(120,70,50,.55)'; g.lineWidth = 3; g.beginPath(); g.moveTo(64, 66); g.lineTo(60, 84); g.lineTo(68, 85); g.stroke();
+    g.strokeStyle = def.female ? '#a8343c' : '#7a3a34'; g.lineWidth = def.female ? 5 : 3.5; g.beginPath();
+    if (def.hostile) { g.moveTo(48, 100); g.quadraticCurveTo(64, 94, 80, 100); } else { g.moveTo(48, 98); g.quadraticCurveTo(64, 108, 80, 98); } g.stroke();
+    if (def.glasses) { g.strokeStyle = '#111'; g.lineWidth = 4; g.strokeRect(28, 50, 32, 24); g.strokeRect(68, 50, 32, 24); g.beginPath(); g.moveTo(60, 60); g.lineTo(68, 60); g.stroke(); }
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return faceCache[key] = t;
+  }
+  const SKINS = [0xe0b394, 0xd9a883, 0xc99a78, 0xeac4a8];
   function buildMesh(def) {
     const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
-    const skin = lm(0xd9b08c), shirt = lm(def.color), pants = lm(def.pants || 0x2a2a3a), hair = lm(def.hair || 0x222222);
-    const legL = limb(0.17, 0.82, 0.2, pants, 0.84), legR = limb(0.17, 0.82, 0.2, pants, 0.84); legL.position.x = -0.12; legR.position.x = 0.12; body.add(legL, legR);
-    const torso = new THREE.Mesh(boxGeo, shirt); torso.scale.set(0.52, 0.7, 0.28); torso.position.y = 1.2; body.add(torso);
-    const armL = limb(0.13, 0.68, 0.15, shirt, 1.5), armR = limb(0.13, 0.68, 0.15, shirt, 1.5); armL.position.x = -0.34; armR.position.x = 0.34; body.add(armL, armR);
-    const head = new THREE.Mesh(boxGeo, skin); head.scale.set(0.27, 0.3, 0.27); head.position.y = 1.72; body.add(head);
-    const hr = new THREE.Mesh(boxGeo, hair); hr.scale.set(0.29, 0.12, 0.29); hr.position.y = 1.88; body.add(hr);
-    if (def.female) { const hb = new THREE.Mesh(boxGeo, hair); hb.scale.set(0.29, 0.4, 0.1); hb.position.set(0, 1.68, -0.12); body.add(hb); }
-    const eyeM = lm(0x111111);
-    for (const x of [-0.06, 0.06]) { const e = new THREE.Mesh(boxGeo, eyeM); e.scale.set(0.04, 0.04, 0.02); e.position.set(x, 1.74, 0.14); body.add(e); }
-    if (def.boss) { const glasses = new THREE.Mesh(boxGeo, lm(0x000000)); glasses.scale.set(0.3, 0.07, 0.03); glasses.position.set(0, 1.74, 0.14); body.add(glasses); }
+    const sk = def.skin !== undefined ? def.skin : (def.name ? def.name.length % 4 : 0);
+    const skin = std(SKINS[sk % 4], 0.55), shirt = std(def.color, 0.8), pants = std(def.pants || 0x2a2a3a, 0.8), hairM = std(def.hair || 0x222222, 0.7), shoe = std(0x141414, 0.4, 0.1);
+    const suit = !def.female && !def.neutral || def.suit;
+    // nogi + buty
+    const legL = limbG(0.085, 0.86, pants, 0.9), legR = limbG(0.085, 0.86, pants, 0.9); legL.position.x = -0.11; legR.position.x = 0.11;
+    for (const l of [legL, legR]) l.add(mesh(boxGeo, shoe, 0.11, 0.07, 0.28, 0, -0.9, 0.05));
+    body.add(legL, legR);
+    // spódnica dla nauczycielek
+    if (def.female) body.add(mesh(GEO.cone, std(def.pants || 0x2a2a30, 0.85), 0.3, 0.5, 0.26, 0, 0.84, 0));
+    // tułów
+    const torsoCol = suit && def.jacket !== false ? std(def.color, 0.75) : shirt;
+    body.add(mesh(GEO.cyl, torsoCol, 0.22, 0.62, 0.15, 0, 1.2, 0));
+    body.add(mesh(GEO.sph, torsoCol, 0.235, 0.12, 0.16, 0, 1.5, 0));            // barki
+    body.add(mesh(GEO.cyl, skin, 0.05, 0.1, 0.05, 0, 1.58, 0));                  // szyja
+    if (suit) { body.add(mesh(boxGeo, std(0xeeeeee, 0.7), 0.1, 0.26, 0.02, 0, 1.38, 0.15)); body.add(mesh(boxGeo, std(def.boss ? 0x7a0a0a : 0x222a6a, 0.5), 0.045, 0.22, 0.02, 0, 1.35, 0.162)); }
+    // ręce
+    const armL = limbG(0.055, 0.62, torsoCol, 1.5, skin, 0.055), armR = limbG(0.055, 0.62, torsoCol, 1.5, skin, 0.055); armL.position.x = -0.3; armR.position.x = 0.3; body.add(armL, armR);
+    // głowa
+    const head = mesh(GEO.sph, skin, 0.125, 0.15, 0.13, 0, 1.73, 0); body.add(head);
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(0.235, 0.235), new THREE.MeshStandardMaterial({ map: faceTex(def), transparent: true, roughness: 0.6, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+    face.position.set(0, 1.725, 0.128); body.add(face);
+    body.add(mesh(GEO.sph, skin, 0.022, 0.03, 0.02, -0.125, 1.72, 0), mesh(GEO.sph, skin, 0.022, 0.03, 0.02, 0.125, 1.72, 0)); // uszy
+    // włosy
+    if (def.hair !== 0xb8b8b8 || true) {
+      const hc = mesh(GEO.cap, hairM, 0.135, 0.16, 0.14, 0, 1.745, -0.005); hc.rotation.x = -0.12; body.add(hc);
+      if (def.female) { body.add(mesh(GEO.cyl, hairM, 0.13, 0.32, 0.07, 0, 1.6, -0.1)); body.add(mesh(GEO.sph, hairM, 0.07, 0.07, 0.07, 0, 1.87, -0.09)); }
+      else body.add(mesh(GEO.cyl, hairM, 0.125, 0.08, 0.11, 0, 1.72, -0.06));
+    }
+    if (def.glasses) for (const x of [-0.045, 0.045]) { const r = new THREE.Mesh(new THREE.TorusGeometry(0.036, 0.004, 6, 14), std(0x111111, 0.3, 0.5)); r.position.set(x, 1.74, 0.138); body.add(r); }
+    if (def.boss) { body.add(mesh(boxGeo, std(0x050505, 0.2, 0.3), 0.27, 0.05, 0.03, 0, 1.745, 0.14)); }
     g.scale.setScalar(def.scale || 1);
+    g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; } });
     const col = def.hostile ? '#ff5a4a' : def.ally ? '#6aff8a' : '#cccccc';
     const label = labelSprite(def.name, def.tag, col); label.position.y = 2.3 * (def.scale || 1); g.add(label);
     const bang = bangSprite(); bang.position.y = 2.75 * (def.scale || 1); bang.visible = false; g.add(bang);

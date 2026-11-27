@@ -1,0 +1,24 @@
+{
+  "name": "tk25-szlugen-machen",
+  "version": "1.0.0",
+  "description": "Ucieczka z TK 25: Szlugen Machen — 3D horror-comedy / stealth",
+  "main": "main.js",
+  "author": "TK25",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win portable --x64"
+  },
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "pl.tk25.szlugenmachen",
+    "productName": "Ucieczka z TK 25",
+    "artifactName": "Ucieczka-z-TK25-${version}.${ext}",
+    "directories": { "output": "dist" },
+    "files": ["index.html", "main.js", "audio.js", "map.js", "ai.js", "game.js", "lib/**", "assets/**"],
+    "win": { "target": [{ "target": "portable", "arch": ["x64"] }], "signAndEditExecutable": false }
+  }
+}

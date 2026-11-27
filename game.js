@@ -917,6 +917,8 @@ function frame() {
 function boot() {
   try {
     initGL(); buildMenu(); $('loading').classList.add('hidden'); $('menu').classList.remove('hidden'); G.state = 'menu';
+    const sb = $('btnStart'), t0txt = sb.textContent; sb.disabled = true; sb.textContent = 'Ładowanie modeli postaci…';
+    Promise.race([AI.loadModels(), new Promise(r => setTimeout(() => r(false), 25000))]).then((ok) => { sb.disabled = false; sb.textContent = t0txt; if (!ok) console.warn('Tryb proceduralnych postaci'); });
     window.__tk = { simStep, updateHUD, K, G, P, MAP, AI, CHARS, startRun, endRun, say, addStars, nearbyTargets, doInteract, hide, unhide, pickups: () => pickups, scene, camera, openExit, openPacketTracer, useExit, useShop, applyFavor, FAVORS, openDialogFavor };
     frame();
   } catch (e) { $('loading').textContent = 'Błąd inicjalizacji: ' + e.message; console.error(e); }

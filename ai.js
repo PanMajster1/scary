@@ -114,8 +114,55 @@ const AI = (() => {
     if (def.glasses) { g.strokeStyle = '#111'; g.lineWidth = 4; g.strokeRect(28, 50, 32, 24); g.strokeRect(68, 50, 32, 24); g.beginPath(); g.moveTo(60, 60); g.lineTo(68, 60); g.stroke(); }
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return faceCache[key] = t;
   }
+  // ---------------------------------------------------------- prawdziwe modele GLB (szkielet Mixamo + animacje)
+  // assets/models/manifest.json: { "demkow": { "file": "soldier.glb", "scale": 1 }, "topinek": "topinek.glb", ... }
+  // Animacje w pliku rozpoznawane po nazwach: idle / walk / run (np. z Mixamo). Brak wpisu = model proceduralny.
+  const MODELS = { ready: false, byId: {} };
+  function stripRoot(clip) { const c = clip.clone(); c.tracks = c.tracks.filter(t => !/\.(position|scale)$/.test(t.name)); return c; }
+  async function loadModels() {
+    if (!window.GLTFLoader || !window.SkeletonUtils || typeof fetch !== 'function') return false;
+    try {
+      const mr = await fetch('assets/models/manifest.json'); if (!mr.ok) return false;
+      const man = await mr.json(), ld = new window.GLTFLoader(), cache = {};
+      for (const id in man) {
+        const e = typeof man[id] === 'string' ? { file: man[id] } : man[id];
+        if (!cache[e.file]) {
+          const r = await fetch('assets/models/' + e.file); if (!r.ok) { console.warn('Brak modelu', e.file); continue; }
+          const buf = await r.arrayBuffer();
+          cache[e.file] = await new Promise((res, rej) => ld.parse(buf, '', res, rej));
+        }
+        const gltf = cache[e.file], find = (re) => gltf.animations.find(c => re.test(c.name)) || gltf.animations[0];
+        if (!gltf.animations.length) { console.warn('Model bez animacji', e.file); continue; }
+        MODELS.byId[id] = { gltf, scale: e.scale || 1, tint: e.tint === undefined ? 0.6 : e.tint, clips: { idle: stripRoot(find(/idle/i)), walk: stripRoot(find(/walk/i)), run: stripRoot(find(/run/i)) } };
+      }
+      MODELS.ready = Object.keys(MODELS.byId).length > 0;
+    } catch (e) { console.warn('Modele GLB niedostępne — tryb proceduralny:', e.message); MODELS.ready = false; }
+    return MODELS.ready;
+  }
+  function buildGLB(def, id) {
+    const m = MODELS.byId[id]; const root = window.SkeletonUtils.clone(m.gltf.scene); root.scale.multiplyScalar(m.scale);
+    const g = new THREE.Group(); g.add(root); g.scale.setScalar(def.scale || 1);
+    root.traverse((o) => {
+      if (!o.isMesh) return;
+      o.material = o.material.clone(); o.frustumCulled = false; o.castShadow = true; o.receiveShadow = false; o.material.envMapIntensity = 0.8;
+      if (m.tint !== 1) o.material.color.multiplyScalar(m.tint);
+    });
+    const mixer = new THREE.AnimationMixer(root), act = {};
+    for (const n of ['idle', 'walk', 'run']) { act[n] = mixer.clipAction(m.clips[n]); act[n].play(); act[n].setEffectiveWeight(n === 'idle' ? 1 : 0); }
+    const label = labelSprite(def.name, def.tag, def.hostile ? '#ff5a4a' : def.ally ? '#6aff8a' : '#cccccc'); label.position.y = 2.3 * (def.scale || 1); g.add(label);
+    const bang = bangSprite(); bang.position.y = 2.75 * (def.scale || 1); bang.visible = false; g.add(bang);
+    const d = () => new THREE.Group();
+    return { g, legL: d(), legR: d(), armL: d(), armR: d(), label, bang, body: root, mixer, act, w: { idle: 1, walk: 0, run: 0 } };
+  }
+  function animGLB(m, a, dt) {
+    const sp = a.speedNow, tgt = sp < 0.25 ? 'idle' : sp < 3.4 ? 'walk' : 'run';
+    for (const n of ['idle', 'walk', 'run']) { m.w[n] += ((n === tgt ? 1 : 0) - m.w[n]) * Math.min(1, dt * 9); m.act[n].setEffectiveWeight(m.w[n]); }
+    m.act.walk.timeScale = Math.max(0.5, Math.min(1.8, sp / 1.45)); m.act.run.timeScale = Math.max(0.8, Math.min(1.6, sp / 5.2));
+    m.mixer.update(dt);
+  }
   const SKINS = [0xe0b394, 0xd9a883, 0xc99a78, 0xeac4a8];
-  function buildMesh(def) {
+  function buildMesh(def, id) {
+    if (MODELS.ready && MODELS.byId[id]) { try { return buildGLB(def, id); } catch (e) { console.warn('GLB nieudany, fallback', e); } }
     const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
     const sk = def.skin !== undefined ? def.skin : (def.name ? def.name.length % 4 : 0);
     const skin = std(SKINS[sk % 4], 0.55), shirt = std(def.color, 0.8), pants = std(def.pants || 0x2a2a3a, 0.8), hairM = std(def.hair || 0x222222, 0.7), shoe = std(0x141414, 0.4, 0.1);
@@ -162,7 +209,7 @@ const AI = (() => {
     const a = { id, def, L, x, z, y: L * MAP.H, yaw: Math.random() * 6.28, state: def.kind === 'hunter' ? 'patrol' : 'idle', path: null, pi: 0, stun: 0, wait: 0.5,
       anim: 0, speedNow: 0, seenT: 0, lostT: 0, lastSeen: null, target: null, repathT: 0, stuckT: 0, lastX: x, lastZ: z, cool: 0, hintT: 8, sawHide: null,
       lineT: 5 + Math.random() * 6, sees: false, active: true, home: { L, x, z }, mode: null, freezeT: 0, seeAcc: 0, ...opts };
-    a.mesh = buildMesh(def);
+    a.mesh = buildMesh(def, id);
     a.mesh.g.position.set(x, a.y, z);
     ctx.scene.add(a.mesh.g);
     actors.push(a); return a;
@@ -422,7 +469,7 @@ const AI = (() => {
     a.mesh.g.visible = a.active;
     if (!a.active) { if (should) { a.active = true; const r = MAP.roomByName('Korytarz główny', 0); const p = MAP.randomPointInRoom(r, 0.8); a.x = p.x; a.z = p.z; a.L = 0; a.path = null; a.state = 'patrol'; a.mesh.g.visible = true; ctx.say(a, 'Dyżur! Wszyscy do klas!'); } return; }
     if (!should && a.state !== 'chase') { if (!a.leaving) { a.leaving = true; goTo(a, 0, 4, 18); } follow(a, dt, def.patrol + 1); if (!a.path || a.pi >= a.path.length) { a.active = false; a.leaving = false; a.mesh.g.visible = false; } return; }
-    a.leaving = false; a.cool -= dt;
+    a.leaving = false; a.cool -= dt; a.cool2 = (a.cool2 || 0) - dt;
     if (a.stun > 0) { a.stun -= dt; a.speedNow = 0; return; }
     a.seeT = (a.seeT || 0) - dt;
     if (a.seeT <= 0) { a.seeT = 0.1; a.sees = canSee(a, P); }
@@ -433,7 +480,7 @@ const AI = (() => {
       a.repathT -= dt; if (a.repathT <= 0 || !a.path) { a.repathT = 0.4; const t = a.lastSeen; if (t) goTo(a, t.L, t.x, t.z); }
       follow(a, dt, def.chase);
       const d = Math.hypot(P.x - a.x, P.z - a.z);
-      if (d < 1.1 && a.sees && Math.abs(P.y - a.y) < 1.8) { say(a, 'caught'); ctx.caught(a); }
+      if (d < 1.4 && a.sees && a.cool2 <= 0 && Math.abs(P.y - a.y) < 1.8) { a.cool2 = 20; say(a, 'caught'); ctx.freeze(1.2, a); a.state = 'patrol'; a.path = null; a.wait = 2; }
     } else {
       if (a.wait > 0) { a.wait -= dt; a.speedNow = 0; return; }
       if (!a.path || a.needRepath) { a.needRepath = false; if (!nextPatrol(a)) { a.wait = 1; return; } }
@@ -490,11 +537,14 @@ const AI = (() => {
       if (a.def.kind === 'situational' && !a.active) continue;
       groundSync(a);
       // animacja
+      const m = a.mesh;
+      if (m.mixer) { if (a.stun > 0) a.speedNow = 0; animGLB(m, a, dt); } else {
       a.anim += a.speedNow * dt * 2.6;
-      const sw = Math.min(1, a.speedNow / 2) * 0.7, m = a.mesh;
+      const sw = Math.min(1, a.speedNow / 2) * 0.7;
       m.legL.rotation.x = Math.sin(a.anim) * sw; m.legR.rotation.x = -Math.sin(a.anim) * sw;
       m.armL.rotation.x = -Math.sin(a.anim) * sw * 0.8; m.armR.rotation.x = Math.sin(a.anim) * sw * 0.8;
       if (a.state === 'chase') { m.armL.rotation.x = -1.3; m.armR.rotation.x = -1.3; }
+      }
       if (a.stun > 0) { m.body.rotation.z = Math.sin(performance.now() / 120) * 0.15; } else m.body.rotation.z = 0;
       m.g.position.set(a.x, a.y, a.z); m.g.rotation.y = a.yaw;
       const dP = Math.hypot(ctx.P.x - a.x, ctx.P.z - a.z) + Math.abs(ctx.P.y - a.y) * 3;
@@ -513,5 +563,5 @@ const AI = (() => {
   function init(c) { ctx = c; }
   function clear() { for (const a of actors.slice()) remove(a); }
 
-  return { DEFS, actors, init, create, remove, get, update, hearNoise, stunArea, nearestHostileDist, goTo, clear, pickQuiz, canSee };
+  return { loadModels, MODELS, DEFS, actors, init, create, remove, get, update, hearNoise, stunArea, nearestHostileDist, goTo, clear, pickQuiz, canSee };
 })();

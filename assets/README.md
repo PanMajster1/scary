@@ -16,3 +16,18 @@ Gra jest w całości proceduralna i działa bez tego folderu. Jeśli chcesz podm
 
 Dodatkowo utwórz `assets/tex/manifest.json` z listą użytych nazw, np. `["floor", "wall"]`. Tekstury ładują się przy starcie (w wersji `.exe` działają od razu; w przeglądarce wymagają
 uruchomienia przez lokalny serwer, np. `python3 -m http.server`).
+
+## Własne modele postaci (.glb)
+
+Każdą postać możesz podmienić modelem 3D ze szkieletem (np. z Mixamo, Sketchfab, Quaternius). Wrzuć `.glb` do
+`assets/models/` i dopisz go w `assets/models/manifest.json`, np.:
+
+```json
+{ "demkow": { "file": "soldier.glb", "scale": 1.0 }, "topinek": "topinek.glb", "pawlyszcze": "pawlyszcze.glb" }
+```
+
+Nazwy postaci: `topinek`, `demkow`, `pawlyszcze`, `orlowska`, `iduszkiewicz`, `kowalczyk`, `ziebinski`, `florczykiewicz`,
+`mariusz`, `grymek`, `jelonek`, `porada`, `kaczmarczyk`, `rajca`, `student`. Model powinien mieć ok. 1,8 m wysokości
+(w razie potrzeby podaj `scale`), twarzą do +Z, oraz animacje o nazwach zawierających `idle`, `walk` i `run`.
+Modele ładują się przez `fetch`, więc w przeglądarce potrzebny jest serwer lokalny; wersja `.exe` działa od razu.
+Dołączony `soldier.glb` (Vanguard, z przykładów three.js) to Mega Boss Demkow.

@@ -11,7 +11,7 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1600, height: 900, backgroundColor: '#000000', title: 'Ucieczka z TK 25: Szlugen Machen',
     autoHideMenuBar: true, fullscreen: true,
-    webPreferences: { contextIsolation: true, nodeIntegration: false, backgroundThrottling: false },
+    webPreferences: { contextIsolation: true, nodeIntegration: false, backgroundThrottling: false, webSecurity: false },
   });
   win.loadFile(path.join(__dirname, 'index.html'));
   // F11 — pełny ekran / okno, Ctrl+Q — wyjście

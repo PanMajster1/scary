@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>Ucieczka z TK 25: Szlugen Machen</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --gold:#f2c230; --red:#d8232a; --green:#3fd16a; --ink:#0b0d12; --panel:rgba(10,12,18,.88); }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; overflow:hidden; background:#000; color:#eee; font-family: "Segoe UI", Arial, sans-serif; user-select:none; }
+  canvas#view { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  .hidden { display:none !important; }
+  .gta { font-family: Impact, "Arial Black", sans-serif; letter-spacing:1px; text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
+
+  /* ---------- MENU ---------- */
+  #menu { position:fixed; inset:0; z-index:50; overflow:auto; padding:22px 18px 40px;
+    background: radial-gradient(ellipse at 50% 0%, #2a1a1e 0%, #0b0d12 70%); }
+  #menu h1 { margin:0; text-align:center; font-size:clamp(28px,5vw,58px); color:var(--gold); }
+  #menu h1 small { display:block; font-size:.42em; color:#ff6b6b; margin-top:4px; }
+  #menu .sub { text-align:center; color:#9aa; margin:6px 0 16px; font-size:14px; }
+  #charGrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:12px; max-width:1180px; margin:0 auto; }
+  .card { background:var(--panel); border:2px solid #333; border-radius:10px; padding:12px; cursor:pointer; transition:.15s; position:relative; }
+  .card:hover { border-color:#777; transform:translateY(-2px); }
+  .card.sel { border-color:var(--gold); box-shadow:0 0 18px rgba(242,194,48,.35); }
+  .card .portrait { height:74px; border-radius:6px; margin-bottom:8px; display:flex; align-items:center; justify-content:center; font-size:38px; }
+  .card h3 { margin:0; font-size:18px; color:var(--gold); }
+  .card .nick { font-size:12px; color:#9ab; margin-bottom:6px; }
+  .card .quote { font-style:italic; font-size:12.5px; color:#ddd; margin:6px 0; min-height:32px; }
+  .card .desc { font-size:12px; color:#bcd; min-height:62px; }
+  .stat { display:flex; align-items:center; font-size:11px; color:#9ab; margin:2px 0; }
+  .stat span { width:62px; } .stat i { flex:1; height:6px; background:#222; border-radius:3px; overflow:hidden; } .stat b { display:block; height:100%; background:linear-gradient(90deg,#c33,#fc3); }
+  .rec { margin-top:8px; font-size:11.5px; color:#cdd; border-top:1px dashed #444; padding-top:6px; line-height:1.5; }
+  .rank { display:inline-block; min-width:20px; text-align:center; padding:0 5px; border-radius:3px; background:#333; color:#fff; font-weight:bold; }
+  .rank.S{background:#e8b820;color:#000} .rank.A{background:#3fb860} .rank.B{background:#3a85d8} .rank.C{background:#777}
+  .secret { color:#c9a0ff; } .secret.locked { color:#556; }
+  #menuBottom { max-width:1180px; margin:16px auto 0; display:flex; flex-wrap:wrap; gap:14px; align-items:stretch; }
+  .box { background:var(--panel); border:1px solid #333; border-radius:10px; padding:12px 14px; font-size:13px; flex:1 1 320px; }
+  .box h4 { margin:0 0 6px; color:var(--gold); font-size:14px; }
+  .modeRow { display:flex; gap:8px; margin:4px 0 10px; }
+  .btn { background:#222; color:#fff; border:2px solid #555; border-radius:8px; padding:10px 16px; cursor:pointer; font:inherit; font-weight:600; }
+  .btn:hover { border-color:var(--gold); } .btn.on { background:#4a3a08; border-color:var(--gold); color:var(--gold); }
+  .btn.big { font-size:22px; padding:14px 38px; background:var(--red); border-color:#ff6b6b; font-family:Impact,sans-serif; letter-spacing:2px; width:100%; margin-top:8px; }
+  .btn.big:hover { background:#f02a30; }
+  kbd { background:#333; border:1px solid #666; border-bottom-width:2px; border-radius:4px; padding:0 5px; font-size:11px; color:#fff; }
+  #controlsHelp td { padding:1px 8px 1px 0; vertical-align:top; font-size:12.5px; color:#cdd; }
+
+  /* ---------- HUD ---------- */
+  #hud { position:fixed; inset:0; z-index:10; pointer-events:none; }
+  #crosshair { position:absolute; left:50%; top:50%; width:6px; height:6px; margin:-3px; border-radius:50%; background:rgba(255,255,255,.7); box-shadow:0 0 4px #000; }
+  #stars { position:absolute; right:18px; top:14px; font-size:34px; letter-spacing:4px; }
+  #stars .s { color:#333; } #stars .s.on { color:var(--gold); text-shadow:0 0 8px #f2c230,2px 2px 0 #000; }
+  #stars.flash { animation: flash .35s steps(2) 6; }
+  @keyframes flash { 50% { opacity:.15 } }
+  #phase { position:absolute; left:50%; top:10px; transform:translateX(-50%); text-align:center; font-size:17px; padding:4px 16px; background:rgba(0,0,0,.55); border-radius:20px; border:2px solid #fff3; }
+  #phase.lesson { color:#7cc4ff; } #phase.break { color:#ffb347; }
+  #timerBox { position:absolute; left:50%; top:46px; transform:translateX(-50%); text-align:center; }
+  #timer { font-size:30px; color:#fff; } #timer.warn { color:#ff5a4a; }
+  #modeLbl { font-size:11px; color:#aab; margin-top:-4px; }
+  #splits { position:absolute; left:14px; top:14px; font-size:12px; line-height:1.55; color:#cde; background:rgba(0,0,0,.4); padding:6px 10px; border-radius:6px; min-width:190px; }
+  #splits div b { color:var(--gold); float:right; margin-left:14px; font-variant-numeric:tabular-nums; }
+  #objectives { position:absolute; right:14px; top:66px; width:300px; font-size:13px; background:rgba(0,0,0,.5); border-left:3px solid var(--gold); padding:8px 10px; border-radius:0 6px 6px 0; }
+  #objectives h5 { margin:0 0 4px; color:var(--gold); font-size:12px; letter-spacing:1px; }
+  #objectives .o { margin:3px 0; color:#dde; } #objectives .o.done { color:#6c8; text-decoration:line-through; opacity:.7; }
+  #objectives .o.sub { margin-left:12px; font-size:12px; color:#bcd; }
+  #bottom { position:absolute; left:14px; bottom:14px; width:260px; }
+  .bar { height:12px; background:rgba(0,0,0,.6); border:1px solid #888; border-radius:3px; overflow:hidden; margin-bottom:6px; }
+  .bar > div { height:100%; background:linear-gradient(90deg,#2a9a4a,#7ae27a); width:100%; transition:width .1s; }
+  #staminaFill.low { background:linear-gradient(90deg,#9a2a2a,#e27a7a); }
+  #staminaFill.beer { background:linear-gradient(90deg,#c8a020,#ffe060); }
+  #inv { display:flex; flex-wrap:wrap; gap:5px; max-width:480px; }
+  #inv .slot { width:46px; height:46px; background:rgba(0,0,0,.6); border:2px solid #666; border-radius:6px; position:relative; display:flex; align-items:center; justify-content:center; font-size:23px; }
+  #inv .slot.sel { border-color:var(--gold); box-shadow:0 0 8px #f2c23088; }
+  #inv .slot .n { position:absolute; right:2px; bottom:0; font-size:11px; color:#fff; font-weight:bold; }
+  #inv .slot .k { position:absolute; left:3px; top:0; font-size:10px; color:#aaa; }
+  #bottomRight { position:absolute; right:14px; bottom:14px; text-align:right; }
+  #inv { margin-top:4px; }
+  #skillBox { display:inline-block; margin-top:6px; padding:5px 12px; background:rgba(0,0,0,.6); border:2px solid #777; border-radius:6px; font-size:13px; }
+  #skillBox.ready { border-color:var(--green); color:#9f9; } #skillBox.none { display:none; }
+  #fatherBox { display:inline-block; margin:6px 0 0 6px; padding:5px 12px; background:rgba(0,0,0,.6); border:2px solid #777; border-radius:6px; font-size:13px; }
+  #fatherBox.ready { border-color:#ff9a3a; color:#ffb870; }
+  #subs { position:absolute; left:50%; bottom:92px; transform:translateX(-50%); width:min(900px,92vw); text-align:center; font-size:18px; }
+  #subs div { background:rgba(0,0,0,.62); display:inline-block; margin:2px 0; padding:3px 12px; border-radius:6px; text-shadow:1px 1px 0 #000; }
+  #subs b { margin-right:6px; }
+  #prompt { position:absolute; left:50%; top:58%; transform:translateX(-50%); font-size:18px; background:rgba(0,0,0,.65); padding:5px 14px; border-radius:6px; border:1px solid #fff4; }
+  #prompt kbd { font-size:15px; color:var(--gold); }
+  #banner { position:absolute; left:50%; top:24%; transform:translateX(-50%); font-size:38px; color:var(--gold); text-align:center; opacity:0; transition:opacity .4s; }
+  #banner.show { opacity:1; } #banner small { display:block; font-size:.45em; color:#fff; font-family:Arial; letter-spacing:0; }
+  #sms { position:absolute; right:-380px; top:240px; width:310px; background:#101820; border:2px solid #4cd964; border-radius:16px; padding:10px 14px; transition:right .4s; box-shadow:0 0 20px #000; font-size:14px; }
+  #sms.show { right:16px; } #sms .from { color:#4cd964; font-weight:bold; font-size:12px; margin-bottom:3px; } #sms .t { color:#fff; line-height:1.35; }
+  #vignette { position:absolute; inset:0; background: radial-gradient(ellipse at center, rgba(0,0,0,0) 40%, rgba(190,0,0,.85) 100%); opacity:0; }
+  #blackout { position:absolute; inset:0; background:#000; opacity:0; display:flex; align-items:center; justify-content:center; font-size:30px; color:#fff; text-align:center; transition:opacity .3s; }
+  #blackout.on { opacity:.97; }
+  #hideOverlay { position:absolute; inset:0; background:
+     repeating-linear-gradient(0deg,#000 0 14px,transparent 14px 20px); opacity:0; transition:opacity .2s; }
+  #hideOverlay.on { opacity:.82; }
+  #hideOverlay::after { content:''; position:absolute; inset:0; box-shadow:inset 0 0 220px 90px #000; }
+  #beerFx { position:absolute; inset:0; background:radial-gradient(circle,#ffd04010,#ffb00030); opacity:0; }
+  #minimap { position:absolute; inset:0; background:rgba(0,0,0,.82); display:none; align-items:center; justify-content:center; flex-direction:column; pointer-events:none; }
+  #minimap.on { display:flex; }
+  #minimap h3 { margin:0 0 8px; color:var(--gold); } #mmCanvas { max-width:94vw; max-height:78vh; border:3px solid #555; background:#000; image-rendering:pixelated; }
+  #minimap .leg { margin-top:8px; font-size:13px; color:#cde; }
+
+  /* ---------- MODAL / PAUSE / END ---------- */
+  .overlay { position:fixed; inset:0; z-index:60; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.6); }
+  .dialog { background:var(--panel); border:2px solid var(--gold); border-radius:12px; padding:18px 22px; width:min(640px,94vw); max-height:92vh; overflow:auto; box-shadow:0 0 40px #000; }
+  .dialog h2 { margin:0 0 6px; color:var(--gold); font-size:22px; } .dialog p { margin:6px 0; font-size:15px; line-height:1.4; }
+  .dialog .opts { display:flex; flex-direction:column; gap:7px; margin-top:10px; }
+  .dialog .opts .btn { text-align:left; }
+  .dialog .btn.good { border-color:#3fd16a; background:#143a20; } .dialog .btn.bad { border-color:#d8232a; background:#3a1214; }
+  .dialog .row { display:flex; align-items:center; gap:10px; margin:8px 0; }
+  .dialog select, .dialog input[type=text] { background:#111; color:#fff; border:1px solid #666; border-radius:6px; padding:7px; font:inherit; }
+  .dialog input[type=range] { flex:1; }
+  .pt { background:#06121e; border:1px solid #2a5a8a; border-radius:8px; padding:10px; margin:8px 0; }
+  .pt .dev { display:inline-block; text-align:center; font-size:12px; padding:6px 8px; border:1px solid #4a8ac8; border-radius:6px; background:#0b2238; }
+  .pt .link { display:flex; align-items:center; gap:8px; margin:6px 0; font-size:13px; }
+  .pt .link select { flex:1; }
+  .prog { height:16px; background:#111; border:1px solid #555; border-radius:4px; overflow:hidden; margin:8px 0; } .prog div { height:100%; width:0; background:#3fd16a; }
+  .term { background:#000; color:#4f4; font-family:Consolas,monospace; font-size:12.5px; padding:8px; border-radius:6px; min-height:70px; white-space:pre-wrap; }
+  .keypad { display:flex; gap:10px; justify-content:center; margin:10px 0; } .keypad input { width:64px; font-size:30px; text-align:center; }
+  #endScreen { z-index:70; background:rgba(0,0,0,.86); flex-direction:column; text-align:center; }
+  #endScreen h1 { font-size:clamp(34px,7vw,76px); margin:0; } #endScreen.win h1 { color:var(--gold); } #endScreen.lose h1 { color:var(--red); }
+  #endScreen .stats { margin:14px 0; font-size:18px; line-height:1.7; }
+  #loading { position:fixed; inset:0; z-index:100; background:#0b0d12; display:flex; align-items:center; justify-content:center; font-size:22px; color:var(--gold); }
+  #errBox { position:fixed; left:8px; bottom:8px; z-index:200; background:#400; color:#fcc; padding:6px 10px; font:12px monospace; max-width:90vw; display:none; }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+
+<div id="loading" class="gta">Ładowanie TK 25…</div>
+<div id="errBox"></div>
+
+<!-- MENU -->
+<div id="menu" class="hidden">
+  <h1 class="gta">Ucieczka z TK 25<small>Szlugen Machen</small></h1>
+  <div class="sub">3D Horror-Comedy / Stealth-Action • wybierz postać, tryb i spróbuj uciec z lekcji u Topinka</div>
+  <div id="charGrid"></div>
+  <div id="menuBottom">
+    <div class="box" style="max-width:380px">
+      <h4>TRYB GRY</h4>
+      <div class="modeRow">
+        <button class="btn on" id="modeLimit">⏱ Limit 45 min</button>
+        <button class="btn" id="modeSpeed">⚡ Speedrun</button>
+      </div>
+      <div style="font-size:12px;color:#9ab">Limit: masz 45 minut, potem Topinek wpisuje Cię na czarną listę. Speedrun: stoper i splity bez limitu.</div>
+      <button class="btn big" id="btnStart">START — ZADZWONIŁ DZWONEK</button>
+    </div>
+    <div class="box">
+      <h4>STEROWANIE</h4>
+      <table id="controlsHelp"><tr>
+        <td><kbd>W A S D</kbd> ruch</td><td><kbd>Mysz</kbd> rozglądanie</td><td><kbd>Shift</kbd> sprint (hałas!)</td></tr><tr>
+        <td><kbd>Ctrl</kbd>/<kbd>C</kbd> kucanie</td><td><kbd>E</kbd> interakcja / kryjówka</td><td><kbd>F</kbd> latarka</td></tr><tr>
+        <td><kbd>Q</kbd> skill postaci</td><td><kbd>G</kbd>/<kbd>LPM</kbd> użyj przedmiotu</td><td><kbd>1-9</kbd> wybór przedmiotu</td></tr><tr>
+        <td><kbd>R</kbd> Strzał ojcowski!</td><td><kbd>M</kbd>/<kbd>Tab</kbd> plan szkoły</td><td><kbd>Esc</kbd> pauza / ustawienia</td></tr></table>
+    </div>
+  </div>
+</div>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div id="vignette"></div><div id="beerFx"></div><div id="hideOverlay"></div>
+  <div id="crosshair"></div>
+  <div id="splits" class="gta"></div>
+  <div id="phase" class="gta lesson">LEKCJA</div>
+  <div id="timerBox"><div id="timer" class="gta">00:00</div><div id="modeLbl"></div></div>
+  <div id="stars" class="gta"></div>
+  <div id="objectives"></div>
+  <div id="bottom">
+    <div class="bar"><div id="staminaFill"></div></div>
+    <div id="invHint" style="font-size:11px;color:#aaa">KONDYCJA</div>
+  </div>
+  <div id="bottomRight"><div id="inv" style="justify-content:flex-end"></div><div><span id="skillBox" class="none"></span><span id="fatherBox" class="hidden"></span></div></div>
+  <div id="subs"></div>
+  <div id="prompt" class="hidden"></div>
+  <div id="banner" class="gta"></div>
+  <div id="sms"><div class="from"></div><div class="t"></div></div>
+  <div id="blackout" class="gta"></div>
+  <div id="minimap"><h3 class="gta" id="mmTitle"></h3><canvas id="mmCanvas"></canvas><div class="leg">🟡 ty • 🟢 Ziębiński • ⭐ cele • 🚪 wyjścia/schody • M / Tab — zamknij</div></div>
+</div>
+
+<div id="modal" class="overlay hidden"><div class="dialog" id="modalBody"></div></div>
+
+<div id="pause" class="overlay hidden"><div class="dialog">
+  <h2 class="gta">PAUZA</h2>
+  <div class="row">Czułość myszy <input type="range" id="sens" min="0.3" max="3" step="0.05" value="1"><span id="sensV">1.0</span></div>
+  <div class="row">Głośność <input type="range" id="vol" min="0" max="1" step="0.05" value="0.7"><span id="volV">0.7</span></div>
+  <div class="row"><label><input type="checkbox" id="tts"> Głos lektora (jeśli przeglądarka ma polski głos)</label></div>
+  <div class="opts"><button class="btn" id="btnResume">▶ Wróć do gry</button><button class="btn" id="btnQuit">✖ Zakończ run (do menu)</button></div>
+</div></div>
+
+<div id="endScreen" class="overlay hidden"></div>
+
+<script>
+  window.addEventListener('error', e => { const b = document.getElementById('errBox'); b.style.display = 'block'; b.textContent = 'Błąd: ' + e.message + ' (' + (e.filename || '').split('/').pop() + ':' + e.lineno + ')'; });
+</script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
+<script>window.THREE || document.write('<script src="lib/three.min.js"><\/script>');</script>
+<script src="audio.js"></script>
+<script src="map.js"></script>
+<script src="ai.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
